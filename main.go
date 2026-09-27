@@ -2,128 +2,166 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"sync"
+	"time"
+
 	"learngo/pharmacy"
 )
 
 func main() {
 
-	for {
+	// Load medicines from CSV
+	err := pharmacy.LoadMedicines()
+	if err != nil {
+		fmt.Println("Error loading medicines:", err)
+	}
 
-		fmt.Println("\n==============================")
-		fmt.Println("   PHARMACY MEDICINE INVENTORY")
-		fmt.Println("==============================")
-		fmt.Println("1. Add Medicine")
-		fmt.Println("2. Find Medicine")
-		fmt.Println("3. Dispense Medicine")
-		fmt.Println("4. Discard Expired Batch")
-		fmt.Println("==============================")
+	// Goroutine
+	var wg sync.WaitGroup
+	wg.Add(1)
 
-		var choice int
+	go welcomeMessage(&wg)
 
-		fmt.Print("Enter your choice: ")
-		fmt.Scanln(&choice)
+	wg.Wait()
 
-		switch choice {
+	// Command-line arguments
+	args := os.Args[1:]
 
-		case 1:
-			addMedicine()
+	if len(args) == 0 {
+		fmt.Println("\nNo command given.")
+		fmt.Println("\nAvailable commands:")
+		fmt.Println("add      - Add medicine")
+		fmt.Println("find     - Find medicine")
+		fmt.Println("dispense - Dispense medicine")
+		fmt.Println("discard  - Discard expired batch")
+		fmt.Println("list     - Display all medicines")
+		return
+	}
 
-		case 2:
-			findMedicine()
+	command := args[0]
 
-		case 3:
-			dispenseMedicine()
+	switch command {
 
-		case 4:
-			discardExpiredBatch()
+	case "add":
 
-
-		default:
-			fmt.Println("Invalid choice!")
+		if len(args) != 6 {
+			fmt.Println("Usage:")
+			fmt.Println("go run . add <batch> <brand> <generic> <stock> <expiry>")
+			return
 		}
+
+		stock, err1 := strconv.Atoi(args[4])
+		expiry, err2 := strconv.Atoi(args[5])
+
+		if err1 != nil || err2 != nil {
+			fmt.Println("Stock and expiry must be numbers.")
+			return
+		}
+
+		medicine := pharmacy.Medicine{
+			BatchNumber: args[1],
+			BrandName:   args[2],
+			GenericName: args[3],
+			StockUnits:  stock,
+			ExpiryYear:  expiry,
+		}
+
+		err := pharmacy.AddMedicine(medicine)
+
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+
+		fmt.Println("Medicine added successfully!")
+
+	case "find":
+
+		if len(args) != 2 {
+			fmt.Println("Usage:")
+			fmt.Println("go run . find <batch>")
+			return
+		}
+
+		medicine, err := pharmacy.FindMedicine(args[1])
+
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+
+		fmt.Println("\nMedicine Found!")
+		fmt.Println("-------------------------")
+		fmt.Println("Batch Number:", medicine.BatchNumber)
+		fmt.Println("Brand Name:", medicine.BrandName)
+		fmt.Println("Generic Name:", medicine.GenericName)
+		fmt.Println("Stock Units:", medicine.StockUnits)
+		fmt.Println("Expiry Year:", medicine.ExpiryYear)
+
+	case "dispense":
+
+		if len(args) != 3 {
+			fmt.Println("Usage:")
+			fmt.Println("go run . dispense <batch> <quantity>")
+			return
+		}
+
+		qty, err := strconv.Atoi(args[2])
+
+		if err != nil {
+			fmt.Println("Quantity must be a number.")
+			return
+		}
+
+		err = pharmacy.DispenseMedicine(args[1], qty)
+
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+
+		fmt.Println("Medicine dispensed successfully!")
+
+	case "discard":
+
+		if len(args) != 2 {
+			fmt.Println("Usage:")
+			fmt.Println("go run . discard <batch>")
+			return
+		}
+
+		err := pharmacy.DiscardExpiredBatch(args[1])
+
+		if err != nil {
+			fmt.Println("Error:", err)
+			return
+		}
+
+		fmt.Println("Expired batch discarded successfully!")
+
+	case "list":
+
+		pharmacy.DisplayMedicines()
+
+	default:
+
+		fmt.Println("Unknown command:", command)
+		fmt.Println("\nAvailable commands:")
+		fmt.Println("add")
+		fmt.Println("find")
+		fmt.Println("dispense")
+		fmt.Println("discard")
+		fmt.Println("list")
 	}
 }
 
-func addMedicine() {
+func welcomeMessage(wg *sync.WaitGroup) {
 
-	var medicine pharmacy.Medicine
+	defer wg.Done()
 
-	fmt.Print("Enter Batch Number: ")
-	fmt.Scanln(&medicine.BatchNumber)
+	time.Sleep(1 * time.Second)
 
-	fmt.Print("Enter Brand Name: ")
-	fmt.Scanln(&medicine.BrandName)
-
-	fmt.Print("Enter Generic Name: ")
-	fmt.Scanln(&medicine.GenericName)
-
-	fmt.Print("Enter Stock Units: ")
-	fmt.Scanln(&medicine.StockUnits)
-
-	fmt.Print("Enter Expiry Year: ")
-	fmt.Scanln(&medicine.ExpiryYear)
-
-	pharmacy.AddMedicine(medicine)
-
-	fmt.Println("Medicine added successfully!")
-}
-
-func findMedicine() {
-
-	var batch string
-
-	fmt.Print("Enter Batch Number: ")
-	fmt.Scanln(&batch)
-
-	medicine, err := pharmacy.FindMedicine(batch)
-
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	fmt.Println("\nMedicine Found!")
-	fmt.Println("Batch Number:", medicine.BatchNumber)
-	fmt.Println("Brand Name:", medicine.BrandName)
-	fmt.Println("Generic Name:", medicine.GenericName)
-	fmt.Println("Stock Units:", medicine.StockUnits)
-	fmt.Println("Expiry Year:", medicine.ExpiryYear)
-}
-
-func dispenseMedicine() {
-
-	var batch string
-	var qty int
-
-	fmt.Print("Enter Batch Number: ")
-	fmt.Scanln(&batch)
-
-	fmt.Print("Enter Quantity: ")
-	fmt.Scanln(&qty)
-
-	err := pharmacy.DispenseMedicine(batch, qty)
-
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	fmt.Println("Medicine dispensed successfully!")
-}
-
-func discardExpiredBatch() {
-
-	var batch string
-
-	fmt.Print("Enter Batch Number: ")
-	fmt.Scanln(&batch)
-
-	err := pharmacy.DiscardExpiredBatch(batch)
-
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	fmt.Println("Expired batch discarded successfully!")
+	fmt.Println("Welcome to Pharmacy Medicine Inventory System")
 }
